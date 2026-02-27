@@ -165,7 +165,7 @@ const dataparcClient = axios.create({
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
   // Uncomment below ONLY for development if dataPARC uses a self-signed SSL cert
-  // httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
+  httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
 });
 
 // ─── Request Interceptor: Auto-attach Bearer Token ───────────────────────────
