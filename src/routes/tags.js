@@ -131,6 +131,16 @@ router.get('/test-auth', async (req, res) => {
   }
 });
 
+// GET /api/tags/by-id/:tagId/current
+router.get('/by-id/:tagId/current', async (req, res) => {
+  try {
+    const data = await getTagCurrentValueById(parseInt(req.params.tagId));
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 
 module.exports = router;
