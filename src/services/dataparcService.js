@@ -93,17 +93,15 @@ dataparcClient.interceptors.response.use(
   }
 );
 
-// ── Tag ID cache ──────────────────────────────────────────────────────────────
+// ── Tag ID map cache ──────────────────────────────────────────────────────────
 let tagCache = null;
 
 async function getTagMap() {
   if (tagCache) return tagCache;
   const response = await dataparcClient.get('/api/v1/tags');
-  const tags = response.data;
-  // Build a map: { "OEE": 135, "Clinker_Production": 132, ... }
   tagCache = {};
-  tags.forEach((tag) => {
-    tagCache[tag.name] = tag.id;
+  response.data.forEach((tag) => {
+    tagCache[tag.name] = tag.id;  // { "OEE": 135, "Clinker_Production": 132 }
   });
   return tagCache;
 }
@@ -114,81 +112,80 @@ async function getAllTags() {
   return response.data;
 }
 
-// ── Get current value by tag ID ───────────────────────────────────────────────
+// ── Get current value for a single tag by name ────────────────────────────────
 async function getTagCurrentValue(tagName) {
   const tagMap = await getTagMap();
   const tagId = tagMap[tagName];
+  if (!tagId) throw new Error(`Tag "${tagName}" not found in dataPARC`);
 
-  if (!tagId) {
-    throw new Error(`Tag "${tagName}" not found in dataPARC`);
-  }
+  const response = await dataparcClient.get('/api/v1/read/current', {
+    params: { tagIds: tagId },
+  });
 
-  // Try common dataPARC Store current value endpoints by ID
-  try {
-    const response = await dataparcClient.get(`/api/v1/tags/${tagId}/current`);
-    return response.data;
-  } catch {
-    try {
-      const response = await dataparcClient.get(`/api/v1/tags/${tagId}/values/latest`);
-      return response.data;
-    } catch {
-      const response = await dataparcClient.get(`/api/v1/snapshot?ids=${tagId}`);
-      return Array.isArray(response.data) ? response.data[0] : response.data;
-    }
-  }
+  const result = Array.isArray(response.data) ? response.data[0] : response.data;
+  return result;
 }
 
-// ── Get current value by tag ID directly ─────────────────────────────────────
-async function getTagCurrentValueById(tagId) {
-  try {
-    const response = await dataparcClient.get(`/api/v1/tags/${tagId}/current`);
-    return response.data;
-  } catch {
-    try {
-      const response = await dataparcClient.get(`/api/v1/tags/${tagId}/values/latest`);
-      return response.data;
-    } catch {
-      const response = await dataparcClient.get(`/api/v1/snapshot?ids=${tagId}`);
-      return Array.isArray(response.data) ? response.data[0] : response.data;
-    }
-  }
+// ── Get current values for multiple tags at once (batch) ─────────────────────
+async function getMultipleTagsCurrentValue(tagNames) {
+  const tagMap = await getTagMap();
+
+  const tagIds = tagNames
+    .map((name) => tagMap[name])
+    .filter(Boolean);
+
+  if (tagIds.length === 0) throw new Error('No valid tag IDs found');
+
+  const response = await dataparcClient.get('/api/v1/read/current', {
+    params: { tagIds: tagIds.join(',') },
+  });
+
+  // Map results back to tag names
+  const idToName = {};
+  tagNames.forEach((name) => {
+    if (tagMap[name]) idToName[tagMap[name]] = name;
+  });
+
+  return response.data.map((item) => ({
+    tagName: idToName[item.tagId] || String(item.tagId),
+    tagId: item.tagId,
+    value: item.value,
+    time: item.time,
+    status: item.status,
+    quality: item.quality,
+  }));
 }
 
-// ── Get historical data by tag ID ─────────────────────────────────────────────
+// ── Get historical/raw data for a tag ────────────────────────────────────────
 async function getTagHistory(tagName, startTime, endTime) {
   const tagMap = await getTagMap();
   const tagId = tagMap[tagName];
   if (!tagId) throw new Error(`Tag "${tagName}" not found`);
 
-  try {
-    const response = await dataparcClient.get(`/api/v1/tags/${tagId}/history`, {
-      params: { start: startTime, end: endTime },
-    });
-    return response.data;
-  } catch {
-    const response = await dataparcClient.get(`/api/v1/tags/${tagId}/raw`, {
-      params: { start: startTime, end: endTime },
-    });
-    return response.data;
-  }
+  const response = await dataparcClient.get('/api/v1/read/raw', {
+    params: { tagIds: tagId, start: startTime, end: endTime },
+  });
+
+  return Array.isArray(response.data) ? response.data : [response.data];
 }
 
-// ── Get aggregate by tag ID ───────────────────────────────────────────────────
+// ── Get aggregate data for a tag ─────────────────────────────────────────────
 async function getTagAggregate(tagName, startTime, endTime, aggregateType = 'average') {
   const tagMap = await getTagMap();
   const tagId = tagMap[tagName];
   if (!tagId) throw new Error(`Tag "${tagName}" not found`);
 
-  const response = await dataparcClient.get(`/api/v1/tags/${tagId}/aggregate`, {
-    params: { start: startTime, end: endTime, type: aggregateType },
+  const response = await dataparcClient.get('/api/v1/read/aggregate', {
+    params: { tagIds: tagId, start: startTime, end: endTime, type: aggregateType },
   });
-  return response.data;
+
+  return Array.isArray(response.data) ? response.data[0] : response.data;
 }
 
 module.exports = {
   getAllTags,
   getTagCurrentValue,
-  getTagCurrentValueById,
+  getMultipleTagsCurrentValue,
   getTagHistory,
   getTagAggregate,
 };
