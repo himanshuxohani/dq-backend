@@ -8,14 +8,3 @@ app.listen(PORT, () => {
   console.log(`🌐 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 dataPARC Server: ${process.env.DATAPARC_BASE_URL}`);
 });
-
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://13.201.40.224',
-    'http://13.201.40.224:3000',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
