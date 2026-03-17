@@ -173,52 +173,52 @@
 
 // module.exports = app;
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+// require('dotenv').config();
+// const express = require('express');
+// const cors = require('cors');
+// const helmet = require('helmet');
+// const morgan = require('morgan');
 
-const tagsRouter = require('./routes/tags');
-const historianRouter = require('./routes/historian');
+// const tagsRouter = require('./routes/tags');
+// const historianRouter = require('./routes/historian');
 
-const app = express();
+// const app = express();
 
-// ─── Security Headers ────────────────────────────────────────────────────────
-app.use(helmet());
+// // ─── Security Headers ────────────────────────────────────────────────────────
+// app.use(helmet());
 
-// ─── CORS ────────────────────────────────────────────────────────────────────
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://65.2.131.181',
-    'http://65.2.131.181:3000',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+// // ─── CORS ────────────────────────────────────────────────────────────────────
+// app.use(cors({
+//   origin: [
+//     'http://localhost:3000',
+//     'http://65.2.131.181',
+//     'http://65.2.131.181:3000',
+//   ],
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+//   credentials: true
+// }));
 
-// ─── Logging ─────────────────────────────────────────────────────────────────
-app.use(morgan('combined'));
+// // ─── Logging ─────────────────────────────────────────────────────────────────
+// app.use(morgan('combined'));
 
-// ─── Body Parser ─────────────────────────────────────────────────────────────
-app.use(express.json());
+// // ─── Body Parser ─────────────────────────────────────────────────────────────
+// app.use(express.json());
 
-// ─── Health Check ────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
+// // ─── Health Check ────────────────────────────────────────────────────────────
+// app.get('/health', (req, res) => {
+//   res.json({
+//     status: 'ok',
+//     timestamp: new Date().toISOString(),
+//     uptime: process.uptime(),
+//   });
+// });
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
-app.use('/api/tags', tagsRouter);
-app.use('/api/historian', historianRouter);
+// // ─── Routes ──────────────────────────────────────────────────────────────────
+// app.use('/api/tags', tagsRouter);
+// app.use('/api/historian', historianRouter);
 
-// ─── Ollama Config ───────────────────────────────────────────────────────────
+// // ─── Ollama Config ───────────────────────────────────────────────────────────
 // const OLLAMA_BASE_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 // const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || 'llama3.2';  // change to any pulled model
 
@@ -273,15 +273,86 @@ app.use('/api/historian', historianRouter);
 //   }
 // });
 
-// Remove ollama, use Groq (free)
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = 'llama-3.1-8b-instant'; // free model
 
+
+// // ─── 404 Handler ─────────────────────────────────────────────────────────────
+// app.use((req, res) => {
+//   res.status(404).json({ success: false, message: 'Route not found' });
+// });
+
+// // ─── Global Error Handler ─────────────────────────────────────────────────────
+// app.use((err, req, res, next) => {
+//   console.error('Unhandled error:', err.message);
+//   res.status(500).json({
+//     success: false,
+//     message: 'Internal server error',
+//     ...(process.env.NODE_ENV === 'development' && { error: err.message }),
+//   });
+// });
+
+// module.exports = app;
+
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+
+const tagsRouter = require('./routes/tags');
+const historianRouter = require('./routes/historian');
+
+const app = express();
+
+app.use(helmet());
+
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://65.2.131.181',
+    'http://65.2.131.181:3000',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+app.use(morgan('combined'));
+app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+app.use('/api/tags', tagsRouter);
+app.use('/api/historian', historianRouter);
+
+// ─── Groq Config ─────────────────────────────────────────────────────────────
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = 'llama-3.1-8b-instant';
+
+// ✅ THIS WAS MISSING — you had it commented out!
+const AKSHA_SYSTEM_PROMPT = `You are Aksha V5.0, the AI intelligence system for JK Cement's operations dashboard. 
+You are an expert in cement manufacturing KPIs including OEE, clinker production, kiln utilization, 
+heat/power consumption, CO2, quality parameters, and plant costs. 
+Be concise, professional, and data-oriented. Use bullet points when listing items. Always respond as Aksha.`;
+
+// ─── Aksha Chat Route ─────────────────────────────────────────────────────────
 app.post('/api/aksha/chat', async (req, res) => {
   const { messages } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  // Guard: API key missing
+  if (!GROQ_API_KEY) {
+    console.error('GROQ_API_KEY is not set in .env');
+    return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
   }
 
   try {
@@ -301,8 +372,14 @@ app.post('/api/aksha/chat', async (req, res) => {
       }),
     });
 
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      console.error('Groq error:', groqRes.status, errText);
+      return res.status(502).json({ error: `Groq error ${groqRes.status}: ${errText}` });
+    }
+
     const data = await groqRes.json();
-    const reply = data.choices?.[0]?.message?.content || 'No response.';
+    const reply = data.choices?.[0]?.message?.content || 'No response from Groq.';
     res.json({ reply });
 
   } catch (err) {
